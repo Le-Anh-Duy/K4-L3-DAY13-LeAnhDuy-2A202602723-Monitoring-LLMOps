@@ -40,7 +40,7 @@
 | `validate_logs.py` | 30/100 (41 records, 40 thiếu field/enrichment, 0 correlation ID) | | Baseline còn TODO logging |
 | `validate_dashboard.py` | HỢP LỆ: 6/6 panel (contract) | | Chỉ kiểm tra contract YAML |
 | `pytest` | 22 passed | | Chạy bằng `.venv` |
-| Số traces hợp lệ | | | |
+| Số traces hợp lệ | 0 child span (chỉ root) | 156 traces có retrieval + generation | [06-trace-list](evidence/06-trace-list.png) |
 | Số PII leak | 0 | | Theo `validate_logs.py` |
 | Latency P95 / TTFT P95 | | | |
 | Retrieval success rate | | | |
@@ -58,7 +58,9 @@
 
 ## 5. Tracing và prompt versioning
 
-- **Cách xác nhận traces do chính tôi tạo trong project cá nhân:**
+- **Cách xác nhận traces do chính tôi tạo trong project cá nhân:** mọi trace nằm trong project `day13-k4-l3b-2A202602723`, do `load_test.py` và request thủ công của tôi tạo ra ngày 2026-09-30. Lọc `isRootObservation:true` ra 156 traces `day13-agent-request`, mỗi trace có `correlation_id` trùng với log line trong `data/logs.jsonl`.
+
+![Trace list](evidence/06-trace-list.png)
 - **Cấu trúc root/retrieval/generation observations:** `lab-agent-run` (agent, root) → `retrieval` (retriever, method `LabAgent._retrieve` dùng `@observe` nên tự đánh level ERROR khi retrieval raise) và `llm-generate` (generation, có model, prompt link, `usage_details` input/output, `cost_details`, `completion_start_time` cho TTFT). Input/output chỉ là preview 80 ký tự đã scrub; client Langfuse được tạo với `mask=mask_pii` làm lưới an toàn cho mọi input/output/metadata.
 - **Cách nối trace với log:** `correlation_id` của request được đưa vào trace metadata qua `propagate_attributes`; search ID đó trên Langfuse ra đúng trace của log line.
 - **Trace mẫu:** `47f94465d0e85c97cb63f2a2cd94e1b0` (`correlation_id=req-e2e1782c`), 396ms, $0.002214, 170 tokens.
