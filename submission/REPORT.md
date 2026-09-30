@@ -18,9 +18,9 @@
 
 | Evidence | Đường dẫn |
 |---|---|
-| Pytest cuối | `evidence/01-pytest.png` |
-| Log validator | `evidence/02-log-validator.png` |
-| Dashboard validator | `evidence/03-dashboard-validator.png` |
+| Pytest cuối | `evidence/01-pytest.txt` |
+| Log validator | `evidence/02-log-validator.png` (CP1), `evidence/02-log-validator-final.txt` (cuối) |
+| Dashboard validator | `evidence/03-dashboard-validator.txt` |
 | Structured log | `evidence/04-structured-log.png` |
 | PII redaction | `evidence/05-pii-redaction.png` |
 | Trace list | `evidence/06-trace-list.png` |
@@ -37,13 +37,13 @@
 
 | Nội dung | Baseline | Kết quả cuối | Nhận xét |
 |---|---|---|---|
-| `validate_logs.py` | 30/100 (41 records, 40 thiếu field/enrichment, 0 correlation ID) | | Baseline còn TODO logging |
-| `validate_dashboard.py` | HỢP LỆ: 6/6 panel (contract) | | Chỉ kiểm tra contract YAML |
-| `pytest` | 22 passed | | Chạy bằng `.venv` |
+| `validate_logs.py` | 30/100 (41 records, 40 thiếu field/enrichment, 0 correlation ID) | 100/100 (0 thiếu field, 0 PII leak) | Baseline còn TODO logging; cuối đo trên log challenge |
+| `validate_dashboard.py` | HỢP LỆ: 6/6 panel (contract) | HỢP LỆ: 6/6 panel + dashboard runtime `scripts/dashboard.py` | Validator chỉ kiểm tra contract; runtime xem ảnh 11 |
+| `pytest` | 22 passed | 26 passed | Thêm test PII (CCCD/thẻ/passport, CCCD cạnh thẻ), mask Langfuse, correlation ID |
 | Số traces hợp lệ | 0 child span (chỉ root) | 156 traces có retrieval + generation | [06-trace-list](evidence/06-trace-list.png) |
-| Số PII leak | 0 | | Theo `validate_logs.py` |
-| Latency P95 / TTFT P95 | 785ms / 50ms (30 request, concurrency 1 và 5) | | Đo bằng `/metrics` trước practice incident |
-| Retrieval success rate | 100% | | `tool_success` trong `response_sent` |
+| Số PII leak | 0 | 0 trong log và trace | Log: `validate_logs.py`; trace: quét qua Langfuse API |
+| Latency P95 / TTFT P95 | 785ms / 50ms (30 request, concurrency 1 và 5) | 200ms / 55ms lúc bình thường; 2,666ms / 51ms khi có sự cố challenge | Sau fix P95 về 158ms |
+| Retrieval success rate | 100% | 100% (35/35) | Sự cố challenge làm retrieval chậm chứ không lỗi |
 
 ## 4. Logging và PII
 
