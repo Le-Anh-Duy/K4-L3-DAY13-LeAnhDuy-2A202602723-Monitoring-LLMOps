@@ -5,8 +5,9 @@ import re
 
 PII_PATTERNS: dict[str, str] = {
     "email": r"[\w\.-]+@[\w\.-]+\.\w+",
-    # card before cccd/phone so a 16-digit card is redacted as a whole
-    "credit_card": r"\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b",
+    # card before cccd/phone so a 16-digit card is redacted as a whole;
+    # same separator in all groups so "<cccd> 4111 ..." isn't mistaken for a card
+    "credit_card": r"\b\d{4}([- ]?)\d{4}\1\d{4}\1\d{4}\b",
     "cccd": r"\b\d{12}\b",
     "phone_vn": r"(?<!\d)(?:\+84|0)(?:[ .-]?\d){9}(?!\d)",
     "passport_vn": r"\b[A-Z]\d{7}\b",

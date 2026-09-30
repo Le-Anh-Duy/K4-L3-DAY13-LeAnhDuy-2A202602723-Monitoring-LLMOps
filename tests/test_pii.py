@@ -35,3 +35,8 @@ def test_langfuse_mask_scrubs_nested_data() -> None:
 
     out = mask_pii(data={"q": "mail a@b.com", "docs": ["call 0901234567"], "n": 3})
     assert out == {"q": "mail [REDACTED_EMAIL]", "docs": ["call [REDACTED_PHONE_VN]"], "n": 3}
+
+
+def test_cccd_next_to_card_both_fully_redacted() -> None:
+    out = scrub_text("012345678901 4111 1111 1111 1111")
+    assert out == "[REDACTED_CCCD] [REDACTED_CREDIT_CARD]"
