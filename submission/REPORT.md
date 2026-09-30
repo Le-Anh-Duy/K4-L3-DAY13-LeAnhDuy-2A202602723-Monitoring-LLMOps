@@ -25,7 +25,7 @@
 | PII redaction | `evidence/05-pii-redaction.png` |
 | Trace list | `evidence/06-trace-list.png` |
 | Trace waterfall | `evidence/07-trace-waterfall.png` |
-| Trace metadata | `evidence/08-trace-metadata.png` |
+| Trace metadata | `evidence/08a-trace-generation.png`, `evidence/08b-trace-metadata.png` |
 | Prompt versions | `evidence/09-prompt-versions.png` |
 | Prompt rollback | `evidence/10-prompt-rollback.png` |
 | Dashboard runtime | `evidence/11-dashboard-overview.png` |
