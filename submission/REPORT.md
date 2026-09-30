@@ -9,7 +9,7 @@
 - **Lớp:** K4-L3B
 - **Repository URL:** https://github.com/Le-Anh-Duy/K4-L3-DAY13-LeAnhDuy-2A202602723-Monitoring-LLMOps
 - **Commit SHA cuối:**
-- **Challenge ID:**
+- **Challenge ID:** `day13-k4-l3b-monitoring-llmops-v1`
 - **Tên project Langfuse cá nhân:** `day13-k4-l3b-2A202602723`
 
 ## 2. Evidence index
@@ -31,7 +31,7 @@
 | Dashboard runtime | `evidence/11-dashboard-overview.png` |
 | Incident metric | `evidence/12-incident-metric.png` |
 | Incident log | `evidence/13-incident-log.png` |
-| Incident trace | `evidence/14-incident-trace.png` |
+| Incident trace | `evidence/14a-incident-trace-lookup.png`, `evidence/14b-incident-trace.png` |
 
 ## 3. Kết quả kỹ thuật
 
@@ -91,14 +91,26 @@
 
 ## 7. Điều tra challenge
 
-- **Challenge ID:**
-- **Khoảng thời gian điều tra:**
-- **Triệu chứng từ metrics:**
-- **Log line và correlation ID liên quan:**
-- **Trace ID và span gây ảnh hưởng:**
-- **Root cause:**
-- **Fix action:**
+- **Challenge ID:** `day13-k4-l3b-monitoring-llmops-v1` (cohort K4, `affected_feature: monitoring`, `latency_threshold_ms: 2000`)
+- **Khoảng thời gian điều tra:** 2026-09-30 05:07–05:29 UTC (12:07–12:29 giờ VN). Traffic bình thường lúc 05:07, inject lúc 05:08:15, 15 request challenge lúc 05:08:19–05:08:58, fix lúc 05:28:30. Log trước đó được tách sang `data/logs.cp2.jsonl` để cửa sổ điều tra chỉ chứa dữ liệu challenge.
+- **Triệu chứng từ metrics:** panel Latency: P95 theo phút tăng từ 200ms (05:07) lên 2,666ms (05:08), khoảng 13 lần; P50 từ 156ms lên 2,656ms. TTFT P95 không đổi (55ms → 51ms). Error rate 0%, retrieval success 100%, tokens/cost/quality bình thường, nên sự cố chỉ là latency. Dashboard vẫn báo "within threshold" vì ngưỡng SLO 3000ms quá lỏng cho sự cố này, dù đã vượt ngưỡng 2000ms của challenge. Phía client còn tệ hơn: 5 request song song mất khoảng 13.3s vì `agent.run()` đồng bộ chặn event loop nên request xếp hàng (5 × 2.66s).
+
+  ![Incident metric](evidence/12-incident-metric.png)
+- **Log line và correlation ID liên quan:** `response_sent` lúc `2026-09-30T05:08:21.785434Z`, `correlation_id=req-98a29a3d`, `feature=monitoring`, `latency_ms=2657`, `ttft_ms=50`, `tokens_out=133`, `tool_success=true`. Toàn bộ 15 request sau 05:08 đều là `feature=monitoring` với latency khoảng 2,655ms, trong khi request `monitoring` lúc 05:07 (ví dụ `req-6a78061f`) chỉ 158ms.
+
+  ![Incident log](evidence/13-incident-log.png)
+- **Trace ID và span gây ảnh hưởng:** lọc Langfuse theo `metadata.correlation_id = req-98a29a3d` (ô search tự do không tìm trong metadata) ra trace `737f1f0f133b78cb6f79f06d7ada8da3`: `lab-agent-run` 2.66s, trong đó **span `retrieval` 2.50s** (94%) còn `llm-generate` 153ms như bình thường. Trace bình thường để so sánh: `79602441bfade1dddd9a2e045b2b499f` (`req-6a78061f`, 158ms).
+
+  ![Tra trace theo correlation_id](evidence/14a-incident-trace-lookup.png)
+  ![Incident trace](evidence/14b-incident-trace.png)
+- **Root cause:** bước retrieval (vector store / RAG) bị chậm thêm khoảng 2.5s mỗi request. Kịch bản của challenge là `rag_slow`, được bật qua `/incidents/rag_slow/enable`. Ba nguồn tín hiệu cùng chỉ về một nguyên nhân: latency tăng nhưng TTFT, tokens và lỗi không đổi (metric); request `monitoring` chậm đều khoảng 2.5s (log); span `retrieval` chiếm 2.50s (trace).
+- **Fix action:** tắt sự cố retrieval (`python scripts/inject_incident.py --disable`, lúc 05:28:30), rồi chạy lại đúng traffic challenge: 5 request `monitoring` có `latency_ms` 154–158ms (P95 158ms), client khoảng 860ms. Trong production, bước tương ứng là khôi phục/scale vector store hoặc chuyển sang replica.
 - **Preventive measure:**
+  1. Alert latency hiện tại (P95 > 3000ms) không bắt được sự cố này: thêm alert P95 > 2000ms (ngưỡng challenge) hoặc P95 > 3× baseline trong 5 phút.
+  2. Alert riêng cho độ trễ span `retrieval` (ví dụ P95 retrieval > 1000ms) để chỉ thẳng vào thành phần hỏng, thay vì chỉ thấy triệu chứng tổng.
+  3. Đặt timeout cho retrieval (ví dụ 800ms), hết giờ thì dùng câu trả lời fallback, để một dependency chậm không kéo cả request.
+  4. Chạy `agent.run()` trong threadpool (`run_in_threadpool`) để một request chậm không bắt các request khác xếp hàng (13s phía client).
+  5. Đưa `correlation_id` vào tag của trace để tra log → trace nhanh hơn khi on-call.
 
 > Gợi ý cách viết ngắn, không thay cho evidence thực tế: "Metric cho thấy `[latency/error/cost/quality]` bất thường trong `[khoảng thời gian]`. Log line `[event]` có `correlation_id=[...]` đại diện cho request bị ảnh hưởng. Trace cùng `correlation_id` cho thấy span `[retrieval/generation/prompt/tool]` có dấu hiệu `[chậm/lỗi/token tăng]`. Root cause là `[nguyên nhân suy ra từ evidence]`. Fix action là `[hành động khôi phục]`; preventive measure là `[alert/runbook/test/guardrail để ngăn tái diễn]`."
 
