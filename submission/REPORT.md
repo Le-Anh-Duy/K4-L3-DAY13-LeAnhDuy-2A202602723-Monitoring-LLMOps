@@ -66,10 +66,12 @@
 - **Trace mẫu:** `47f94465d0e85c97cb63f2a2cd94e1b0` (`correlation_id=req-e2e1782c`), 396ms, $0.002214, 170 tokens.
 
 ![Trace waterfall](evidence/07-trace-waterfall.png)
-- **Prompt name:**
-- **Version/label baseline:**
-- **Version/label candidate:**
-- **Trace ID của mỗi version:**
+- **Prompt name:** `day13-chat` (text prompt, tạo và đổi label bằng SDK qua [`scripts/prompt_versions.py`](../scripts/prompt_versions.py)).
+- **Version/label baseline:** v1, labels `baseline` + `production`: template gốc `Feature/Docs/Question`.
+- **Version/label candidate:** v2, label `candidate`: thêm dòng `Answer in at most 3 sentences.`
+- **Trace ID của mỗi version:** cùng input `What is your refund policy?`, server chạy với `LANGFUSE_PROMPT_LABEL` tương ứng:
+  - baseline → v1: `19b0ec6adb6e006833929952abf432d4` (`req-38e156ee`), generation link `day13-chat` v1, 28/169 tokens.
+  - candidate → v2: `6acf94396957ee42d5d6dab4babc8034` (`req-084976a7`), generation link `day13-chat` v2, 35/109 tokens.
 - **Cách promote và rollback `production`:**
 
 ## 6. Dashboard, SLO và alerts
