@@ -28,3 +28,10 @@ def test_scrub_cccd_card_passport() -> None:
         assert raw not in out
     for tag in ("REDACTED_CCCD", "REDACTED_CREDIT_CARD", "REDACTED_PASSPORT_VN"):
         assert tag in out
+
+
+def test_langfuse_mask_scrubs_nested_data() -> None:
+    from app.tracing import mask_pii
+
+    out = mask_pii(data={"q": "mail a@b.com", "docs": ["call 0901234567"], "n": 3})
+    assert out == {"q": "mail [REDACTED_EMAIL]", "docs": ["call [REDACTED_PHONE_VN]"], "n": 3}

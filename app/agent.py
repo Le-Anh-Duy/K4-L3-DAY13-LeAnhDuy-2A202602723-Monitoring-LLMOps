@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 from . import metrics
 from .mock_llm import FakeLLM
@@ -71,13 +72,24 @@ class LabAgent:
                 },
                 version=prompt.version,
             )
-            # TODO (CP2): instrument retrieve() and FakeLLM.generate() as child
-            # observations. The nested generation must receive prompt, usage and cost.
-            with propagate_attributes(prompt=prompt.managed_prompt):
+            with propagate_attributes(prompt=prompt.managed_prompt), langfuse_client.start_as_current_observation(
+                name="llm-generate",
+                as_type="generation",
+                model=self.model,
+                input=prompt.text,
+                prompt=prompt.managed_prompt,
+            ) as generation:
+                llm_started_at = datetime.now(timezone.utc)
                 response = self.llm.generate(prompt.text)
+                cost_usd = self._estimate_cost(response.usage.input_tokens, response.usage.output_tokens)
+                generation.update(
+                    output=response.text,
+                    usage_details={"input": response.usage.input_tokens, "output": response.usage.output_tokens},
+                    cost_details={"total": cost_usd},
+                    completion_start_time=llm_started_at + timedelta(milliseconds=response.ttft_ms),
+                )
             quality_score = self._heuristic_quality(message, response.text, docs)
             latency_ms = int((time.perf_counter() - started) * 1000)
-            cost_usd = self._estimate_cost(response.usage.input_tokens, response.usage.output_tokens)
 
         metrics.record_request(
             latency_ms=latency_ms,

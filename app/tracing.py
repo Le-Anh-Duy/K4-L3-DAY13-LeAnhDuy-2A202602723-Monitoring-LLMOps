@@ -4,8 +4,10 @@ import os
 from contextlib import contextmanager
 from typing import Any
 
+from .pii import scrub_text
+
 try:
-    from langfuse import get_client, observe, propagate_attributes
+    from langfuse import Langfuse, get_client, observe, propagate_attributes
 
     LANGFUSE_SDK_AVAILABLE = True
 except ImportError:  # pragma: no cover - chỉ dùng khi chưa cài requirements
@@ -40,3 +42,19 @@ def tracing_enabled() -> bool:
     return LANGFUSE_SDK_AVAILABLE and bool(
         os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY")
     )
+
+
+def mask_pii(*, data: Any, **_: Any) -> Any:
+    """Langfuse mask: runs on every input/output/metadata before it leaves the process."""
+    if isinstance(data, str):
+        return scrub_text(data)
+    if isinstance(data, dict):
+        return {k: mask_pii(data=v) for k, v in data.items()}
+    if isinstance(data, (list, tuple)):
+        return [mask_pii(data=v) for v in data]
+    return data
+
+
+# Create the singleton with the mask before any @observe call; get_client() then returns it.
+if tracing_enabled():
+    Langfuse(mask=mask_pii)
