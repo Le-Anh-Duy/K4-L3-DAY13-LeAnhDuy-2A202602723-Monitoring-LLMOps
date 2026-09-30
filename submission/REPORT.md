@@ -62,7 +62,7 @@
 
 ![Trace list](evidence/06-trace-list.png)
 - **Cấu trúc root/retrieval/generation observations:** `lab-agent-run` (agent, root) → `retrieval` (retriever, method `LabAgent._retrieve` dùng `@observe` nên tự đánh level ERROR khi retrieval raise) và `llm-generate` (generation, có model, prompt link, `usage_details` input/output, `cost_details`, `completion_start_time` cho TTFT). Input/output chỉ là preview 80 ký tự đã scrub; client Langfuse được tạo với `mask=mask_pii` làm lưới an toàn cho mọi input/output/metadata.
-- **Cách nối trace với log:** `correlation_id` của request được đưa vào trace metadata qua `propagate_attributes`; search ID đó trên Langfuse ra đúng trace của log line.
+- **Cách nối trace với log:** `correlation_id` của request được đưa vào trace metadata qua `propagate_attributes`; trên Langfuse lọc `metadata.correlation_id = <id>` (cột Filters → Metadata, hoặc gõ `metadata.correlation_id:<id>` vào ô search; search chữ tự do không tìm trong metadata) ra đúng trace của log line.
 - **Trace mẫu:** `47f94465d0e85c97cb63f2a2cd94e1b0` (`correlation_id=req-e2e1782c`), 396ms, $0.002214, 170 tokens.
 
 ![Trace waterfall](evidence/07-trace-waterfall.png)
@@ -83,7 +83,7 @@
 - **Dashboard và sáu panel:** `python scripts/dashboard.py` → http://127.0.0.1:8050. Script chỉ dùng stdlib + PyYAML, đọc `config/dashboard.yaml` (title, time range 60 phút, refresh 30s, unit, threshold) và tính lại từ `data/logs.jsonl` mỗi lần refresh; percentile dùng lại `app.metrics.percentile`. Mỗi panel có stat tổng cửa sổ, badge đạt/vượt threshold, biểu đồ theo phút có đường threshold, tooltip và bảng dữ liệu. Đã kiểm tra runtime bằng 3 practice scenario: `rag_slow` đẩy P99 lên ~3.8s (vượt 3000ms), `tool_fail` làm error rate 100% và retrieval success 0% trong phút đó (10 span retrieval ERROR trên Langfuse), `cost_spike` làm tokens_out tăng dốc.
 
 ![Dashboard 6 panel](evidence/11-dashboard-overview.png)
-- **SLO và lý do chọn:** giữ `latency ≤ 3000ms` cho 99.5% request trong 28 ngày. Baseline (30 request): P50 475ms, P95 785ms, P99 1136ms, TTFT P95 50ms, 0 lỗi; 3000ms cao gấp ~2.6 lần P99 nên không báo động giả, nhưng vẫn bắt được retrieval chậm (+2.5s). Xem [`config/slo.yaml`](../config/slo.yaml).
+- **SLO và lý do chọn:** giữ `latency ≤ 3000ms` cho 99.5% request trong 28 ngày. Baseline (30 request): P50 475ms, P95 785ms, P99 1136ms, TTFT P95 50ms, 0 lỗi; 3000ms cao gấp ~2.6 lần P99 nên không báo động giả. Tuy nhiên CP3 cho thấy ngưỡng này quá lỏng: retrieval chậm thêm 2.5s đẩy P95 lên 2,666ms (13× baseline) mà vẫn dưới 3000ms, nên alert không bắn. Rút kinh nghiệm: cần thêm alert theo mức tăng so với baseline hoặc ngưỡng 2000ms (xem mục 7). Xem [`config/slo.yaml`](../config/slo.yaml).
 - **Cách tính error budget:** 100% − 99.5% = 0.5%. Với 10,000 request / 28 ngày thì tối đa 50 request được phép lỗi hoặc chậm hơn 3000ms. Một đợt `tool_fail` như lúc practice (10 request lỗi liên tiếp) đã tiêu 20% budget đó.
 - **Ba alert và runbook tương ứng:** [`config/alert_rules.yaml`](../config/alert_rules.yaml), [`docs/alerts.md`](../docs/alerts.md), đều gửi Slack `#k4-l3b-alerts`: `HighLatencyP95` (warning, P95 > 3000ms trong 5m), `HighErrorRateOrRetrievalFailing` (critical, error rate > 2% hoặc retrieval success < 90% trong 5m), `CostPerRequestSpike` (warning, cost trung bình > $0.004/request = 2× baseline trong 15m).
 
@@ -116,20 +116,20 @@
 
 ## 8. Giải thích và tự đánh giá
 
-- **Một quyết định kỹ thuật quan trọng và lý do:**
-- **Một lỗi/blocker đã gặp:**
-- **Cách tìm nguyên nhân và xử lý:**
-- **Cách hiểu luồng Metrics → Logs → Traces:**
-- **Vai trò của prompt version, token/cost, SLO hoặc rollback trong vận hành LLM:**
-- **Điều quan trọng nhất đã học:**
-- **Hạn chế hoặc phần chưa hoàn thành, nếu có:**
+- **Một quyết định kỹ thuật quan trọng và lý do:** Tách observe ra khỏi agent, để riêng cho gen và retrieve để có thể dễ dàng theo dõi từng thành phần
+- **Một lỗi/blocker đã gặp:** Regex số thẻ và số CCCD từng bị bug vì đều là dãy số, chỉ khác độ dài. Khi CCCD (12 số) đứng ngay trước số thẻ, pattern thẻ khớp nhầm cụm `<CCCD> 4111` thành một số thẻ, nên 12 chữ số còn lại của thẻ bị lộ ra log. `validate_logs.py` không bắt được vì phần còn lại không đủ 16 số.
+- **Cách tìm nguyên nhân và xử lý:** Khi chuẩn bị ảnh 05 (gửi message có đủ email, SĐT, CCCD, thẻ) thì thấy log còn `[REDACTED_CREDIT_CARD] 1111 1111 1111`, check thì thấy pattern thẻ đã ăn mất cả CCCD. Sửa bằng cách bắt số thẻ phải dùng cùng một loại dấu phân cách trong cả 4 nhóm (`\d{4}([- ]?)\d{4}\1\d{4}\1\d{4}`), thêm test cho đúng trường hợp CCCD đứng cạnh thẻ, và đổi tên file log có dòng bị lộ để không dùng làm evidence.
+- **Cách hiểu luồng Metrics → Logs → Traces:** Nhìn metric để thấy là hệ thống có vấn đề hay không và từ lúc nào, logs để biết là request nào bị ảnh hưởng (lấy `correlation_id`), trace của đúng request đó để biết vấn đề ở bước nào và tìm root của vấn đề. Ở CP3: metric cho thấy P95 tăng 13 lần nhưng TTFT không đổi, log cho thấy mọi request `monitoring` đều chậm khoảng 2.5s, trace cho thấy span `retrieval` chiếm 2.50s.
+- **Vai trò của prompt version, token/cost, SLO hoặc rollback trong vận hành LLM:** Các versionning là để lưu lại ưu/nhược điểm của từng version và để có thể roll back 1 cách tin cậy và nhanh chóng
+- **Điều quan trọng nhất đã học:** khi thiết kế hệ thống ta phải thiết kế luôn logging ngay bước này, để sau thì sẽ khó gắn logging hơn
+- **Hạn chế hoặc phần chưa hoàn thành, nếu có:** Các preventive measure ở mục 7 (alert P95 > 2000ms, alert riêng cho retrieval, timeout retrieval, chạy `agent.run()` trong threadpool) mới là đề xuất, chưa sửa vào code/`alert_rules.yaml`. Dashboard là script chạy local, alert chưa gửi Slack thật. PII scrubbing bằng regex chỉ bắt được dạng có cấu trúc (email, SĐT, CCCD, thẻ, passport), không bắt tên hay địa chỉ tự do.
 
 ## 9. Checklist trước khi nộp
 
-- [ ] Kết quả và evidence thuộc commit SHA cuối.
-- [ ] Tất cả ảnh/output mở được bằng đường dẫn tương đối.
-- [ ] Incident evidence nối đúng metric → log → trace.
-- [ ] Trace/prompt evidence thuộc project Langfuse cá nhân và ảnh không lộ key/secret.
-- [ ] Repository chạy lại được theo README.
-- [ ] Không có secret, API key, PII thô hoặc evidence của người khác/lớp khác.
-- [ ] URL repo và commit SHA cuối đã được nộp trên LMS/Codelabs.
+- [x] Kết quả và evidence thuộc commit SHA cuối.
+- [x] Tất cả ảnh/output mở được bằng đường dẫn tương đối.
+- [x] Incident evidence nối đúng metric → log → trace.
+- [x] Trace/prompt evidence thuộc project Langfuse cá nhân và ảnh không lộ key/secret.
+- [x] Repository chạy lại được theo README.
+- [x] Không có secret, API key, PII thô hoặc evidence của người khác/lớp khác.
+- [x] URL repo và commit SHA cuối đã được nộp trên LMS/Codelabs.
