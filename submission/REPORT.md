@@ -4,13 +4,13 @@
 
 ## 1. Thông tin học viên
 
-- **Họ và tên:**
-- **MSSV:**
+- **Họ và tên:** Lê Anh Duy
+- **MSSV:** 2A202602723
 - **Lớp:** K4-L3B
-- **Repository URL:**
+- **Repository URL:** https://github.com/Le-Anh-Duy/K4-L3-DAY13-LeAnhDuy-2A202602723-Monitoring-LLMOps
 - **Commit SHA cuối:**
 - **Challenge ID:**
-- **Tên project Langfuse cá nhân:** `day13-k4-l3b-<MSSV>`
+- **Tên project Langfuse cá nhân:** `day13-k4-l3b-2A202602723`
 
 ## 2. Evidence index
 
@@ -42,8 +42,8 @@
 | `pytest` | 22 passed | | Chạy bằng `.venv` |
 | Số traces hợp lệ | 0 child span (chỉ root) | 156 traces có retrieval + generation | [06-trace-list](evidence/06-trace-list.png) |
 | Số PII leak | 0 | | Theo `validate_logs.py` |
-| Latency P95 / TTFT P95 | | | |
-| Retrieval success rate | | | |
+| Latency P95 / TTFT P95 | 785ms / 50ms (30 request, concurrency 1 và 5) | | Đo bằng `/metrics` trước practice incident |
+| Retrieval success rate | 100% | | `tool_success` trong `response_sent` |
 
 ## 4. Logging và PII
 
