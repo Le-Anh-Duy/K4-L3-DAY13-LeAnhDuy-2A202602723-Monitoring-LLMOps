@@ -59,8 +59,8 @@
 ## 5. Tracing và prompt versioning
 
 - **Cách xác nhận traces do chính tôi tạo trong project cá nhân:**
-- **Cấu trúc root/retrieval/generation observations:**
-- **Cách nối trace với log:**
+- **Cấu trúc root/retrieval/generation observations:** `lab-agent-run` (agent, root) → `retrieval` (retriever, method `LabAgent._retrieve` dùng `@observe` nên tự đánh level ERROR khi retrieval raise) và `llm-generate` (generation, có model, prompt link, `usage_details` input/output, `cost_details`, `completion_start_time` cho TTFT). Input/output chỉ là preview 80 ký tự đã scrub; client Langfuse được tạo với `mask=mask_pii` làm lưới an toàn cho mọi input/output/metadata.
+- **Cách nối trace với log:** `correlation_id` của request được đưa vào trace metadata qua `propagate_attributes`; search ID đó trên Langfuse ra đúng trace của log line.
 - **Prompt name:**
 - **Version/label baseline:**
 - **Version/label candidate:**
@@ -69,10 +69,10 @@
 
 ## 6. Dashboard, SLO và alerts
 
-- **Dashboard và sáu panel:**
-- **SLO và lý do chọn:**
-- **Cách tính error budget:**
-- **Ba alert và runbook tương ứng:**
+- **Dashboard và sáu panel:** `python scripts/dashboard.py` → http://127.0.0.1:8050. Script chỉ dùng stdlib + PyYAML, đọc `config/dashboard.yaml` (title, time range 60 phút, refresh 30s, unit, threshold) và tính lại từ `data/logs.jsonl` mỗi lần refresh; percentile dùng lại `app.metrics.percentile`. Mỗi panel có stat tổng cửa sổ, badge đạt/vượt threshold, biểu đồ theo phút có đường threshold, tooltip và bảng dữ liệu. Đã kiểm tra runtime bằng 3 practice scenario: `rag_slow` đẩy P99 lên ~3.8s (vượt 3000ms), `tool_fail` làm error rate 100% và retrieval success 0% trong phút đó (10 span retrieval ERROR trên Langfuse), `cost_spike` làm tokens_out tăng dốc.
+- **SLO và lý do chọn:** giữ `latency ≤ 3000ms` cho 99.5% request trong 28 ngày. Baseline (30 request): P50 475ms, P95 785ms, P99 1136ms, TTFT P95 50ms, 0 lỗi; 3000ms cao gấp ~2.6 lần P99 nên không báo động giả, nhưng vẫn bắt được retrieval chậm (+2.5s). Xem [`config/slo.yaml`](../config/slo.yaml).
+- **Cách tính error budget:** 100% − 99.5% = 0.5%. Với 10,000 request / 28 ngày thì tối đa 50 request được phép lỗi hoặc chậm hơn 3000ms. Một đợt `tool_fail` như lúc practice (10 request lỗi liên tiếp) đã tiêu 20% budget đó.
+- **Ba alert và runbook tương ứng:** [`config/alert_rules.yaml`](../config/alert_rules.yaml), [`docs/alerts.md`](../docs/alerts.md), đều gửi Slack `#k4-l3b-alerts`: `HighLatencyP95` (warning, P95 > 3000ms trong 5m), `HighErrorRateOrRetrievalFailing` (critical, error rate > 2% hoặc retrieval success < 90% trong 5m), `CostPerRequestSpike` (warning, cost trung bình > $0.004/request = 2× baseline trong 15m).
 
 > Ví dụ cách viết error budget: "SLO 99.5% trong 28 ngày nghĩa là error budget 0.5%. Nếu workload có 10,000 request thì tối đa 50 request được phép lỗi hoặc chậm hơn ngưỡng SLO."
 

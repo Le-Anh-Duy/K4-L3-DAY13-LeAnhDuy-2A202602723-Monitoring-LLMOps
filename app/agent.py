@@ -52,7 +52,7 @@ class LabAgent:
             },
         ):
             started = time.perf_counter()
-            docs = retrieve(message)
+            docs = self._retrieve(message)
             prompt = resolve_prompt(
                 langfuse_client,
                 feature=feature,
@@ -76,14 +76,14 @@ class LabAgent:
                 name="llm-generate",
                 as_type="generation",
                 model=self.model,
-                input=prompt.text,
+                input={"feature": feature, "doc_count": len(docs), "question_preview": summarize_text(message)},
                 prompt=prompt.managed_prompt,
             ) as generation:
                 llm_started_at = datetime.now(timezone.utc)
                 response = self.llm.generate(prompt.text)
                 cost_usd = self._estimate_cost(response.usage.input_tokens, response.usage.output_tokens)
                 generation.update(
-                    output=response.text,
+                    output=summarize_text(response.text),
                     usage_details={"input": response.usage.input_tokens, "output": response.usage.output_tokens},
                     cost_details={"total": cost_usd},
                     completion_start_time=llm_started_at + timedelta(milliseconds=response.ttft_ms),
@@ -109,6 +109,15 @@ class LabAgent:
             cost_usd=cost_usd,
             quality_score=quality_score,
         )
+
+    @observe(name="retrieval", as_type="retriever", capture_input=False, capture_output=False)
+    def _retrieve(self, message: str) -> list[str]:
+        # Previews only (README: no raw prompt/output); @observe marks the span ERROR if retrieve() raises.
+        client = get_langfuse_client()
+        client.update_current_span(input=summarize_text(message))
+        docs = retrieve(message)
+        client.update_current_span(output={"doc_count": len(docs), "docs_preview": [summarize_text(d) for d in docs]})
+        return docs
 
     def _estimate_cost(self, tokens_in: int, tokens_out: int) -> float:
         input_cost = (tokens_in / 1_000_000) * 3
