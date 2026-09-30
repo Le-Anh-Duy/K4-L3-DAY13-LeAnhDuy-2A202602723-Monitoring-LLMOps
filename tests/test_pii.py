@@ -20,3 +20,11 @@ def test_scrub_common_vietnamese_phone_formats() -> None:
         out = scrub_text(f"Contact: {phone_number}")
         assert phone_number not in out
         assert "REDACTED_PHONE_VN" in out
+
+
+def test_scrub_cccd_card_passport() -> None:
+    out = scrub_text("CCCD 012345678901, card 4111 1111 1111 1111, passport C1234567")
+    for raw in ("012345678901", "4111 1111 1111 1111", "C1234567"):
+        assert raw not in out
+    for tag in ("REDACTED_CCCD", "REDACTED_CREDIT_CARD", "REDACTED_PASSPORT_VN"):
+        assert tag in out

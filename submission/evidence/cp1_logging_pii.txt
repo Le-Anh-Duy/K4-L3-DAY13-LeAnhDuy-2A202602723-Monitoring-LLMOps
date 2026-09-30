@@ -1,0 +1,19 @@
+## validate_logs.py (after CP1)
+--- Lab Verification Results ---
+Total log records analyzed: 23
+Records with missing required fields: 0
+Records with missing enrichment (context): 0
+Unique correlation IDs found: 11
+Potential PII leaks detected: 0
+
+--- Grading Scorecard (Estimates) ---
++ [PASSED] Basic JSON schema
++ [PASSED] Correlation ID propagation
++ [PASSED] Log enrichment
++ [PASSED] PII scrubbing
+
+Estimated Score: 100/100
+
+## PII + correlation check: message 'call 0901234567 or a@b.com', header x-request-id: req-cafe1234
+{"service": "api", "payload": {"message_preview": "call [REDACTED_PHONE_VN] or [REDACTED_EMAIL]"}, "event": "request_received", "env": "dev", "feature": "qa", "session_id": "s9", "user_id_hash": "553f26abeeeb", "model": "claude-sonnet-4-5", "correlation_id": "req-cafe1234", "level": "info", "ts": "2026-09-30T03:14:41.604457Z"}
+{"service": "api", "latency_ms": 431, "ttft_ms": 50, "tokens_in": 27, "tokens_out": 88, "cost_usd": 0.001401, "quality_score": 0.8, "tool_name": "retrieval", "tool_success": true, "payload": {"answer_preview": "Starter answer. You should improve this output logic and add better quality chec..."}, "event": "response_sent", "env": "dev", "feature": "qa", "session_id": "s9", "user_id_hash": "553f26abeeeb", "model": "claude-sonnet-4-5", "correlation_id": "req-cafe1234", "level": "info", "ts": "2026-09-30T03:14:42.039745Z"}

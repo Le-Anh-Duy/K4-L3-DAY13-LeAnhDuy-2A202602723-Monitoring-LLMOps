@@ -1,0 +1,21 @@
+## validate_logs.py (baseline)
+--- Lab Verification Results ---
+Total log records analyzed: 43
+Records with missing required fields: 40
+Records with missing enrichment (context): 40
+Unique correlation IDs found: 0
+Potential PII leaks detected: 0
+
+--- Grading Scorecard (Estimates) ---
+- [FAILED] Missing required fields (ts, level, etc.)
+- [FAILED] Correlation ID propagation (less than 2 unique IDs)
+- [FAILED] Log enrichment (missing user_id_hash, etc.)
++ [PASSED] PII scrubbing
+
+Estimated Score: 30/100
+
+## validate_dashboard.py (baseline)
+HỢP LỆ: 6/6 panel có trong dashboard contract.
+
+## pytest (baseline)
+22 passed
