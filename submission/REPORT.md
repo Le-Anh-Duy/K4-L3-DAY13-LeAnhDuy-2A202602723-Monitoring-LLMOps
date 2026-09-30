@@ -50,7 +50,11 @@
 - **Cách tạo/nhận và truyền correlation ID:** `CorrelationIdMiddleware` gọi `clear_contextvars()` đầu mỗi request, chỉ nhận `x-request-id` từ client nếu đúng format `req-<8 hex>` (tránh header injection), ngược lại sinh mới bằng `uuid4`. ID được bind vào structlog contextvars, lưu ở `request.state`, truyền vào trace metadata và trả lại qua header `x-request-id` cùng `x-response-time-ms`.
 - **Các metadata được ghi vào structured log:** `/chat` bind `user_id_hash` (SHA-256, 12 ký tự), `session_id`, `feature`, `model`, `env`; mọi log line trong request tự có các field này cùng `correlation_id`, `ts`, `level`.
 - **Cách bảo đảm PII được scrub trước khi ghi:** processor `scrub_event` được đăng ký trước `JsonlFileProcessor`, nên payload đã được redact trước khi serialize xuống file. Pattern: email, thẻ (đặt trước CCCD/phone để redact nguyên số 16 chữ số), CCCD, phone VN, passport VN.
-- **Cách kiểm chứng kết quả:** `validate_logs.py` từ 30/100 lên 100/100 (0 PII leak, 11 correlation ID). Test mới trong `tests/test_pii.py` và `tests/test_chat_observability.py`. Evidence: [`evidence/cp0_baseline.txt`](evidence/cp0_baseline.txt), [`evidence/cp1_logging_pii.txt`](evidence/cp1_logging_pii.txt).
+- **Cách kiểm chứng kết quả:** `validate_logs.py` từ 30/100 lên 100/100 (0 PII leak, 11 correlation ID). Test mới trong `tests/test_pii.py` và `tests/test_chat_observability.py`. Thêm test cho trường hợp CCCD đứng ngay trước số thẻ: phiên bản pattern thẻ đầu tiên khớp nhầm `<cccd> 4111` thành thẻ và để lộ 12 chữ số còn lại, nên pattern thẻ giờ bắt buộc cùng một loại dấu phân cách trong cả 4 nhóm. Evidence: [`evidence/cp0_baseline.txt`](evidence/cp0_baseline.txt), [`evidence/cp1_logging_pii.txt`](evidence/cp1_logging_pii.txt).
+
+![Log validator 100/100](evidence/02-log-validator.png)
+![Structured log](evidence/04-structured-log.png)
+![PII redaction](evidence/05-pii-redaction.png)
 
 ## 5. Tracing và prompt versioning
 
