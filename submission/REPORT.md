@@ -27,7 +27,7 @@
 | Trace waterfall | `evidence/07-trace-waterfall.png` |
 | Trace metadata | `evidence/08a-trace-generation.png`, `evidence/08b-trace-metadata.png` |
 | Prompt versions | `evidence/09-prompt-versions.png` |
-| Prompt rollback | `evidence/10-prompt-rollback.png` |
+| Prompt rollback | `evidence/10a-prompt-promoted.png`, `evidence/10b-prompt-rolled-back.png` |
 | Dashboard runtime | `evidence/11-dashboard-overview.png` |
 | Incident metric | `evidence/12-incident-metric.png` |
 | Incident log | `evidence/13-incident-log.png` |
@@ -72,7 +72,11 @@
 - **Trace ID của mỗi version:** cùng input `What is your refund policy?`, server chạy với `LANGFUSE_PROMPT_LABEL` tương ứng:
   - baseline → v1: `19b0ec6adb6e006833929952abf432d4` (`req-38e156ee`), generation link `day13-chat` v1, 28/169 tokens.
   - candidate → v2: `6acf94396957ee42d5d6dab4babc8034` (`req-084976a7`), generation link `day13-chat` v2, 35/109 tokens.
-- **Cách promote và rollback `production`:**
+- **Cách promote và rollback `production`:** `python scripts/prompt_versions.py promote` gọi `update_prompt(version=2, new_labels=["candidate", "production"])`; label là duy nhất trong một prompt nên Langfuse tự gỡ `production` khỏi v1. App không cần sửa code hay restart: sau khi cache prompt 60s hết hạn, request `req-1c9da6eb` qua label `production` đã dùng v2 (trace `6607b0f61d094db4ad9d5acd9b5b6b2b`). Rollback bằng `python scripts/prompt_versions.py rollback` (`production` về v1). Request đầu tiên sau khi cache hết hạn (`req-c9241541`, trace `934fd0148770f2e4e21ba99e516541e1`) vẫn dùng v2, vì cache prompt của SDK là stale-while-revalidate: trả bản cũ rồi mới tải lại ở nền. Request kế tiếp (`req-7622a467`, trace `d9c4b6b52e7907127ef84c9bfc6e0cdb`) đã dùng v1. Nghĩa là trong vận hành, rollback prompt mất tối đa khoảng 60s cộng thêm một request mới có hiệu lực; nếu cần nhanh hơn thì giảm `cache_ttl_seconds`.
+
+![Prompt versions trước khi promote](evidence/09-prompt-versions.png)
+![Sau khi promote production sang v2](evidence/10a-prompt-promoted.png)
+![Sau khi rollback production về v1](evidence/10b-prompt-rolled-back.png)
 
 ## 6. Dashboard, SLO và alerts
 
